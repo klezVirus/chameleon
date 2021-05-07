@@ -5,17 +5,19 @@ import string
 import sys
 import re
 from enum import Enum
+import argparse
 
 
 class PSContextType(Enum):
     MAIN = 0
     FUNCTION = 1
-    PARAMS = 2
-    COMMENTS = 3
+    NESTED_FUNCTION = 2
+    PARAMS = 3
+    COMMENTS = 4
 
 
 class PSContext:
-    def __init__(self, name:str, ctx_type: PSContextType):
+    def __init__(self, name: str, ctx_type: PSContextType):
         self.last_line = 0
         self.ctx_type = ctx_type
         self.name = name
@@ -49,7 +51,7 @@ class PSTree:
 
     @property
     def previous(self) -> PSContext:
-        self.ctx.pop(-1)
+        self.ctx.pop()
         return self.current
 
     @property
@@ -61,7 +63,7 @@ class PSTree:
         return len(self.ctx) == 0
 
     def close(self):
-        return self.ctx.pop(-1)
+        self.ctx.pop()
 
     def add_content(self, value):
         self.current.content += f"\n{value}"
@@ -87,6 +89,10 @@ class PSTree:
         matches.sort(key=len)
         return matches[::-1]
 
+    def to_string(self):
+        return "->".join([self.ctx[i].ctx_type.name for i in range(len(self.ctx))])
+
+
 def scramble(text):
     new_text = ""
     for char in text:
@@ -95,6 +101,7 @@ def scramble(text):
         else:
             new_text += char
     return new_text
+
 
 def replace_comments(text):
     # Get rid of <# ... #> comments
@@ -125,89 +132,114 @@ def replace_comments(text):
     return _content
 
 
-with open(sys.argv[1], "r") as ps:
-    content = ps.read()
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description='Chameleon PSMapper - Helper to create obfuscated function mappings'
+    )
+    parser.add_argument('-o', '--outfile', required=True, type=str, default=None, help='Output file')
+    parser.add_argument('target', help='Target PS1 script')
 
-content = replace_comments(content)
-content = content.split("\n")
+    args = parser.parse_args()
 
-tree = PSTree(
-    psctx=PSContext(name="main", ctx_type=PSContextType.MAIN)
-)
+    if not os.path.isfile(args.target):
+        print(f"[-] File {args.target} not found")
+        sys.exit(1)
 
-mapping = {}
-function = ""
+    with open(args.target, "r") as ps:
+        content = ps.read()
 
-for n, line in enumerate(content, start=1):
-    see_next = False
-    tree.current.current_line = n
-    function_match = None
-    param_match = None
-    ob = 0
-    cb = 0
-    tree.add_content(line)
+    content = replace_comments(content)
+    content = content.split("\n")
 
-    if tree.current_ctx_type == PSContextType.MAIN:
-        function_match = re.search(r"function\s+([\w|\_|\-]+)\s*\{?", line, re.MULTILINE | re.IGNORECASE)
+    tree = PSTree(
+        psctx=PSContext(name="main", ctx_type=PSContextType.MAIN)
+    )
 
-        if not function_match:
-            continue
+    mapping = {}
+    function = ""
 
-        function = function_match.groups()[0]
-        print(f"Found new function {function} at line: {n}")
-        tree.change_context(ctx_name=function, ctx_type=PSContextType.FUNCTION)
-        see_next = True
-        ob = function_match.group().count("{")
-        if ob == 0:
-            see_next = True
-        cb = function_match.group().count("}")
-    elif tree.current_ctx_type == PSContextType.FUNCTION:
-        param_match = re.search(r"param[\s|\n|\r|\(]*\(?", line, re.IGNORECASE)
+    for n, line in enumerate(content, start=1):
+        state_changed = False
+        see_next = False
+        tree.current.current_line = n
+        function_match = None
+        param_match = None
+        ob = 0
+        cb = 0
+        tree.add_content(line)
+        if tree.current_ctx_type in [PSContextType.MAIN, PSContextType.FUNCTION, PSContextType.NESTED_FUNCTION]:
+            function_match = re.search(r"(filter|function)\s+([\w][^\s]+)[\{\s]?", line, re.IGNORECASE)
+            param_match = re.search(r"param[\s|\n|\r|\(]*\(?", line, re.IGNORECASE)
 
-        if param_match:
-            tree.change_context(ctx_name=tree.current.name + "-param", ctx_type=PSContextType.PARAMS)
-            ob = param_match.group().count("(")
-            cb = param_match.group().count(")")
-            if ob == 0:
+            if function_match:
+                function = function_match.groups()[1].split("(")[0]
+                if function.find(":") > -1:
+                    function = function.split(":")[1]
+                if tree.current_ctx_type == PSContextType.MAIN:
+                    print(f"Found new function {function} at line: {n}")
+                    tree.change_context(ctx_name=function, ctx_type=PSContextType.FUNCTION)
+                    see_next = True
+                elif tree.current_ctx_type == PSContextType.FUNCTION:
+                    print(f"Found new nested function {function} at line: {n}")
+                    tree.change_context(ctx_name=function, ctx_type=PSContextType.NESTED_FUNCTION)
+                    see_next = True
+                ob = line.count("{")
+                if ob == 0:
+                    see_next = True
+                else:
+                    print(f"Function starts at line: {n}")
+                cb = line.count("}")
+            elif param_match:
+                tree.change_context(ctx_name=tree.current.name + "-param", ctx_type=PSContextType.PARAMS)
+                ob = line.count("(")
+                cb = line.count(")")
+                if ob == 0:
+                    see_next = True
+                else:
+                    print(f"Param() start at line: {n}")
+            else:
+                ob = line.count("{")
+                cb = line.count("}")
+        elif tree.current_ctx_type == PSContextType.PARAMS:
+            ob = line.count("(")
+            cb = line.count(")")
+            if ob == 0 and cb == 0:
                 see_next = True
         else:
-            ob = line.count("{")
-            cb = line.count("}")
-    elif tree.current_ctx_type == PSContextType.PARAMS:
-        ob = line.count("(")
-        cb = line.count(")")
-        if ob == 0 and cb == 0:
-            see_next = True
+            continue
+        tree.open_brackets(nb=ob)
+        tree.close_brackets(nb=cb)
 
-    tree.open_brackets(nb=ob)
-    tree.close_brackets(nb=cb)
+        if tree.balanced and not see_next:
+            if tree.current_ctx_type == PSContextType.PARAMS:
+                params = tree.extract_data()
+                print(f"  > Found parameters: {params}")
+                mapping[function] = params
+                # Close parameters context
+                print(f"Param() close at line {n}")
+                tree.close()
+            elif tree.current_ctx_type == PSContextType.NESTED_FUNCTION:
+                # Close function context
+                print(f"Nested function closes at line {n}")
+                tree.close()
+            elif tree.current_ctx_type == PSContextType.FUNCTION:
+                # Close function context
+                print(f"Function closes at line {n}")
+                tree.close()
 
-    if tree.balanced and not see_next:
-        if tree.current_ctx_type == PSContextType.PARAMS:
-            params = tree.extract_data()
-            print(f"  > Found parameters: {params}")
-            mapping[function] = params
-            # Close parameters context
-            tree.close()
-            # Close function context
-            tree.close()
+    new_mapping = {}
+    for k, v in mapping.items():
+        new_params = {}
+        new_params["original"] = v
+        new_params["repl"] = [scramble(param) for param in v]
 
+        new_mapping[k] = {
+            "repl": scramble(k),
+            "params": new_params
+        }
 
-new_mapping = {}
-for k, v in mapping.items():
+    with open(args.outfile, 'w') as outfile:
+        json.dump(new_mapping, outfile)
 
-    new_params = {}
-    new_params["original"] = v
-    new_params["repl"] = [scramble(param) for param in v]
-
-    new_mapping[k] = {
-        "repl": scramble(k),
-        "params": new_params
-    }
-
-with open('../function_mapping.json', 'w') as outfile:
-    json.dump(new_mapping, outfile)
-
-
-json_formatted = json.dumps(new_mapping, indent=2)
-print(json_formatted)
+    json_formatted = json.dumps(new_mapping, indent=2)
+    # print(json_formatted)

@@ -1,4 +1,5 @@
 # This is a sample Python script.
+import argparse
 import base64
 import ipaddress
 import json
@@ -7,18 +8,14 @@ import random
 import re
 import secrets
 import string
-import struct
 import subprocess
 import sys
 import time
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-import numpy as np
-import argparse
-import colorama
 
-from anytree import Node, RenderTree
+import numpy as np
 from colorama import Fore
 
 
@@ -58,8 +55,9 @@ class Utils:
 class PSContextType(Enum):
     MAIN = 0
     FUNCTION = 1
-    PARAMS = 2
-    COMMENTS = 3
+    NESTED_FUNCTION = 2
+    PARAMS = 3
+    COMMENTS = 4
 
 
 class PSContext:
@@ -134,6 +132,9 @@ class PSTree:
             matches.append(e.strip().lower())
         matches.sort(key=len)
         return matches[::-1]
+
+    def to_string(self):
+        return "->".join([self.ctx[i].ctx_type.name for i in range(len(self.ctx))])
 
 
 class ObfuscationLevel:
@@ -252,72 +253,28 @@ class Chimera:
         }
 
         # Patterns
-        self.nishang_patterns = [
-            r"Write-Verbose[^\n\}\)\(\{\;]+",
-            r"Write-Output[^\n\}\)\(\{\;]+",
-            r"Write-Warning[^\n\}\)\(\{\;]+",
-            r",\s*Mandatory\s*=\s*\$true",
-            r",\s*Mandatory\s*=\s*\$false",
-            r"Mandatory\s*=\s*\$true,",
-            r"Mandatory\s*=\s*\$false,",
-            r"validatepattern"
-        ]
+        self.nishang_patterns = open(
+            os.path.join(
+                Utils.get_project_root(),
+                "config",
+                "nishang.txt")
+        ).readlines()
 
         # AMSI triggering strings
-        self.default_patterns = [
-            "obfuscat",
-            "nishang",
-            "payload",
-            "virus",
-            "malware",
-            "hack",
-            "reverse",
-            "powershell",
-            "icmp",
-            "shell",
-            "backdoor",
-            "evil",
-            "elevate",
-            "privil",
-            "regsitry",
-            "script",
-            "SanityCheck",
-            "WindowsSanity",
-            "execut",
-            "scriptengine",
-            "hidden",
-            "bypass",
-            "regedit.exe",
-            "cmd.exe",
-            "powershell.exe",
-            "encode",
-            "iex ",
-            "invoke- ",
-            "getstream",
-            "new-object",
-            "getstring",
-            "getbytes"
-        ]
+        self.default_patterns = open(
+            os.path.join(
+                Utils.get_project_root(),
+                "config",
+                "strings.txt")
+        ).readlines()
 
-        self.default_type_patterns = [
-            "system.net.sockets.tcpclient",
-            "system.io.streamwriter",
-            "system.byte",
-            "system.text.asciiencoding",
-            "system.diagnostics.processstartinfo",
-            "system.diagnostics.process",
-            "system.text.asciiencoding",
-            "net.sockets.tcpclient",
-            "system.io.streamwriter",
-            "system.net.networkinformation.ping",
-            "psobject",
-            "net.webclient",
-            "system.net.httplistener",
-            "security.principal.windowsprincipal",
-            "system.net.ipendpoint",
-            "text.asciiencoding",
-            "io.streamwriter"
-        ]
+        self.default_type_patterns = open(
+            os.path.join(
+                Utils.get_project_root(),
+                "config",
+                "data_types.txt")
+        ).readlines()
+
         self.dont_backtick = [
             "kernel32",
             "ntdll"
@@ -343,7 +300,9 @@ class Chimera:
             self.eol = "\n"
 
     def load_mapping(self, filename):
-        if not os.path.isfile(filename):
+        if not filename:
+            return
+        if filename and not os.path.isfile(filename):
             Console.auto_line("[-] Mapping file not found")
         try:
             with open(filename, 'r') as in_file:
@@ -495,10 +454,22 @@ class Chimera:
 
         # Single Line Comments
         slc_pattern = re.compile(r"#.+")
-        matches = slc_pattern.finditer(_content)
-        for _, match in enumerate(matches, start=1):
-            _content = _content.replace(match.group(), self.placeholder)
-        self.content = _content
+        s1_pattern = re.compile(r"\"([^\"]*)\"")
+        s2_pattern = re.compile(r"'([^']*)'")
+        for line in rows:
+            match = slc_pattern.search(line)
+            if match:
+                # Single string, we don't do anything = won't break the script
+                res = [s1_pattern.search(line), s2_pattern.search(line)]
+                if any(res):
+                    res = [r.group() for r in res if r and r.group().find("#") > -1]
+                else:
+                    res = []
+                if len(res) > 0:
+                    continue
+
+                _content = _content.replace(match.group(), self.placeholder)
+                self.content = _content
 
     def remove_comment_placeholders(self):
         while self.content.find(self.placeholder) >= 0:
@@ -511,14 +482,38 @@ class Chimera:
             self.content = self.content.replace(self.placeholder, self.create_junk(prefix="#"), 1)
 
     def random_backtick(self):
-        string_pattern1 = re.compile(r'"(.*)"')
-        string_pattern2 = re.compile(r'"(.*)"')
-        matches = [match.groups()[0] for match in string_pattern1.finditer(self.content)] + \
-                  [match.groups()[0] for match in string_pattern2.finditer(self.content)]
-        for _, match in enumerate(matches, start=1):
-            if match in self.dont_backtick:
+        # Pattern 1 and 2 are still unsafe to use
+        string_pattern1 = re.compile(r'"([^\"]+)"')
+        string_pattern2 = re.compile(r"'([^\']+)'")
+        function_pattern = re.compile(r'function\s+([\w\-\:]+)')
+        _content = self.content.split(self.eol)
+        for n, line in enumerate(_content, start=0):
+            f = function_pattern.search(line)
+            s1 = string_pattern1.search(line)
+            s2 = string_pattern2.search(line)
+            _t = 0
+            if f:
+                _t = 1
+                repl = [p.groups()[0] for p in function_pattern.finditer(line)]
+            elif s1 and False:
+                repl = [p.groups()[0] for p in string_pattern1.finditer(line)]
+            elif s2:
+                repl = [p.groups()[0] for p in string_pattern2.finditer(line)]
+            else:
                 continue
-            self.content = self.content.replace(match, self.backticker(match))
+            for match in repl:
+                if _t == 1 and match.find(":") > -1:
+                    match = match.split(":")[1]
+                if _t == 1 and match.find("(") > -1:
+                    match = match.split("(")[0]
+
+                if match in self.dont_backtick:
+                    continue
+                if _t < 1 or match.find("$") + line.find("[") + line.find("]") > -3 or line.count(match) > 1 or re.search(r"[\w]+", match) is None:
+                    continue
+                _content[n] = line.replace(match, self.backticker(match))
+
+        self.content = self.eol.join(_content)
 
     def backticker(self, input_string: str, probability: float = None):
         if not probability:
@@ -544,7 +539,8 @@ class Chimera:
 
     def nishang_script(self):
         for pattern in self.nishang_patterns:
-            self.content = re.sub(pattern, "", self.content, re.IGNORECASE)
+            pattern = re.compile(pattern, re.IGNORECASE)
+            self.content = pattern.sub("", self.content)
 
     def indentation_randomization(self):
         lines = self.content.split(self.eol)
@@ -627,23 +623,17 @@ class Chimera:
         matches.sort(key=len)
         matches = matches[::-1]
         for match in matches:
-            repl = self.random_ascii_string(
-                min_size=self.level.function_min,
-                max_size=self.level.function_max
-            )
-
-            if self.function_mapping:
-                if match in self.function_mapping.keys():
-                    try:
-                        repl = self.function_mapping[match]['repl']
-                    except:
-                        self.function_mapping.pop(match)
-                        continue
+            if match in self.function_mapping.keys():
+                repl = self.function_mapping[match]['repl']
+            else:
+                continue
             if match in "".join(["function", "filter"]):
-                self.function_mapping.pop(match)
+                if self.function_mapping:
+                    self.function_mapping.pop(match)
                 continue
             if not self.safety_check(match):
-                self.function_mapping.pop(match)
+                if self.function_mapping:
+                    self.function_mapping.pop(match)
                 continue
 
             self.content = self.content.replace(
@@ -773,43 +763,52 @@ class Chimera:
             psctx=PSContext(name="main", ctx_type=PSContextType.MAIN)
         )
 
-        content = self.content.split(self.eol)
         mapping = {}
-        function = None
+        function = ""
+        content = self.content.split(self.eol)
         for n, line in enumerate(content, start=1):
+            state_changed = False
             see_next = False
             tree.current.current_line = n
             function_match = None
             param_match = None
             ob = 0
             cb = 0
-
             tree.add_content(line)
-
-            if tree.current_ctx_type == PSContextType.MAIN:
-                function_match = re.search(r"(filter|function)\s+([\w|\_|\-]+)\s*\{?", line,
-                                           re.MULTILINE | re.IGNORECASE)
-
-                if not function_match:
-                    continue
-                function = function_match.groups()[1]
-                if self.debug:
-                    print(f"[D] Found new function {function} at line: {n}")
-                tree.change_context(ctx_name=function, ctx_type=PSContextType.FUNCTION)
-                see_next = True
-                ob = function_match.group().count("{")
-                if ob == 0:
-                    see_next = True
-                cb = function_match.group().count("}")
-            elif tree.current_ctx_type == PSContextType.FUNCTION:
+            if tree.current_ctx_type in [PSContextType.MAIN, PSContextType.FUNCTION, PSContextType.NESTED_FUNCTION]:
+                function_match = re.search(r"(filter|function)\s+([\w][^\s]+)[\{\s]?", line, re.IGNORECASE)
                 param_match = re.search(r"param[\s|\n|\r|\(]*\(?", line, re.IGNORECASE)
 
-                if param_match:
-                    tree.change_context(ctx_name=tree.current.name + "-param", ctx_type=PSContextType.PARAMS)
-                    ob = param_match.group().count("(")
-                    cb = param_match.group().count(")")
+                if function_match:
+                    function = function_match.groups()[1].split("(")[0]
+                    if function.find(":") > -1:
+                        function = function.split(":")[1]
+                    if tree.current_ctx_type == PSContextType.MAIN:
+                        if self.debug:
+                            print(f"Found new function {function} at line: {n}")
+                        tree.change_context(ctx_name=function, ctx_type=PSContextType.FUNCTION)
+                        see_next = True
+                    elif tree.current_ctx_type == PSContextType.FUNCTION:
+                        if self.debug:
+                            print(f"Found new nested function {function} at line: {n}")
+                        tree.change_context(ctx_name=function, ctx_type=PSContextType.NESTED_FUNCTION)
+                        see_next = True
+                    ob = line.count("{")
                     if ob == 0:
                         see_next = True
+                    else:
+                        if self.debug:
+                            print(f"Function starts at line: {n}")
+                    cb = line.count("}")
+                elif param_match:
+                    tree.change_context(ctx_name=tree.current.name + "-param", ctx_type=PSContextType.PARAMS)
+                    ob = line.count("(")
+                    cb = line.count(")")
+                    if ob == 0:
+                        see_next = True
+                    else:
+                        if self.debug:
+                            print(f"Param() start at line: {n}")
                 else:
                     ob = line.count("{")
                     cb = line.count("}")
@@ -818,22 +817,57 @@ class Chimera:
                 cb = line.count(")")
                 if ob == 0 and cb == 0:
                     see_next = True
-
+            else:
+                continue
             tree.open_brackets(nb=ob)
             tree.close_brackets(nb=cb)
 
             if tree.balanced and not see_next:
                 if tree.current_ctx_type == PSContextType.PARAMS:
                     params = tree.extract_data()
-                    self.scoped_variables += params
                     if self.debug:
-                        print(f"  [D] Found parameters: {params}")
+                        print(f"  > Found parameters: {params}")
                     mapping[function] = params
+                    self.scoped_variables += params
                     # Close parameters context
+                    if self.debug:
+                        print(f"Param() close at line {n}")
                     tree.close()
+                elif tree.current_ctx_type == PSContextType.NESTED_FUNCTION:
                     # Close function context
+                    if self.debug:
+                        print(f"Nested function closes at line {n}")
                     tree.close()
+                elif tree.current_ctx_type == PSContextType.FUNCTION:
+                    # Close function context
+                    if self.debug:
+                        print(f"Function closes at line {n}")
+                    tree.close()
+        if not self.function_mapping:
+            Console.auto("    [>] Generating function mapping... ")
+            self.generate_mapping(mapping)
+            self.save_mapping()
+            Console.auto_line("Success")
         self.clean_scoped_variables()
+
+    def generate_mapping(self, mapping, scope="function"):
+        new_mapping = {}
+        for k, v in mapping.items():
+            new_params = {}
+            new_params["original"] = v
+            new_params["repl"] = [Chimera.scramble(param) if scope != "function" else param for param in v]
+
+            new_mapping[k] = {
+                "repl": self.random_ascii_string(
+                    min_size=self.level.function_min,
+                    max_size=self.level.function_max
+                ) if scope else k,
+                "params": new_params
+            }
+        # Updating the global mapping
+        self.function_mapping = new_mapping
+        # Forcing a default file name
+        self.function_mapping_file = "function_mapping.json"
 
     def clean_scoped_variables(self):
         self.scoped_variables = list(set(self.scoped_variables))
@@ -943,11 +977,11 @@ class Console:
 
     @staticmethod
     def success(what):
-        Console.write(what=what, color=Fore.LIGHTGREEN_EX)
+        Console.write(what=what, color=Fore.GREEN)
 
     @staticmethod
     def success_line(what):
-        Console.write_line(what=what, color=Fore.LIGHTGREEN_EX)
+        Console.write_line(what=what, color=Fore.GREEN)
 
     @staticmethod
     def fail(what):
@@ -959,11 +993,11 @@ class Console:
 
     @staticmethod
     def info(what):
-        Console.write(what=what, color=Fore.LIGHTBLUE_EX)
+        Console.write(what=what, color=Fore.BLUE)
 
     @staticmethod
     def info_line(what):
-        Console.write_line(what=what, color=Fore.LIGHTBLUE_EX)
+        Console.write_line(what=what, color=Fore.BLUE)
 
     @staticmethod
     def progress(what):
@@ -1023,14 +1057,15 @@ class Console:
 def welcome():
     banner = rf"""{Fore.RED}__________________________________________________________________________________
     
-  {Fore.LIGHTRED_EX}░░░░░░  {Fore.RED}░░   ░░ {Fore.LIGHTBLUE_EX} ░░░░░  {Fore.BLUE}░░░    ░░░ {Fore.LIGHTYELLOW_EX}░░░░░░░ {Fore.YELLOW}░░     {Fore.LIGHTGREEN_EX}░░░░░░░ {Fore.GREEN} ░░░░░  {Fore.LIGHTCYAN_EX}░░░  ░░ {Fore.CYAN} ░░░
+  {Fore.LIGHTRED_EX}▒▒▒▒▒▒  {Fore.RED}▒▒   ▒▒ {Fore.LIGHTBLUE_EX} ▒▒▒▒▒  {Fore.BLUE}▒▒▒    ▒▒▒ {Fore.LIGHTYELLOW_EX}▒▒▒▒▒▒▒ {Fore.YELLOW}▒▒     {Fore.LIGHTGREEN_EX}▒▒▒▒▒▒▒ {Fore.GREEN} ▒▒▒▒▒  {Fore.LIGHTCYAN_EX}▒▒▒  ▒▒ {Fore.CYAN} ▒▒▒
   {Fore.LIGHTRED_EX}▒▒      {Fore.RED}▒▒   ▒▒ {Fore.LIGHTBLUE_EX}▒▒   ▒▒ {Fore.BLUE}▒▒▒▒  ▒▒▒▒ {Fore.LIGHTYELLOW_EX}▒▒      {Fore.YELLOW}▒▒     {Fore.LIGHTGREEN_EX}▒▒      {Fore.GREEN}▒▒   ▒▒ {Fore.LIGHTCYAN_EX}▒▒▒▒ ▒▒ {Fore.CYAN}▒▒▒▒
   {Fore.LIGHTRED_EX}▓▓      {Fore.RED}▓▓▓▓▓▓▓ {Fore.LIGHTBLUE_EX}▓▓▓▓▓▓▓ {Fore.BLUE}▓▓ ▓▓▓▓ ▓▓ {Fore.LIGHTYELLOW_EX}▓▓▓▓▓   {Fore.YELLOW}▓▓     {Fore.LIGHTGREEN_EX}▓▓▓▓▓   {Fore.GREEN}▓▓   ▓▓ {Fore.LIGHTCYAN_EX}▓▓ ▓▓▓▓ {Fore.CYAN}  ▓▓
   {Fore.LIGHTRED_EX}██      {Fore.RED}██   ██ {Fore.LIGHTBLUE_EX}██   ██ {Fore.BLUE}██  ██  ██ {Fore.LIGHTYELLOW_EX}██      {Fore.YELLOW}██     {Fore.LIGHTGREEN_EX}██      {Fore.GREEN}██   ██ {Fore.LIGHTCYAN_EX}██  ███ {Fore.CYAN}  ██
   {Fore.LIGHTRED_EX}██████  {Fore.RED}██   ██ {Fore.LIGHTBLUE_EX}██   ██ {Fore.BLUE}██      ██ {Fore.LIGHTYELLOW_EX}███████ {Fore.YELLOW}██████ {Fore.LIGHTGREEN_EX}███████ {Fore.GREEN} █████  {Fore.LIGHTCYAN_EX}██   ██ {Fore.CYAN}  ██
-{Fore.RED}__________________________________________________________________________________{Fore.LIGHTWHITE_EX}
-░ by d3adc0de (@klezVirus)
-{Fore.RED}▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔{Fore.WHITE}
+{Fore.RED}----------------------------------------------------------------------------------{Fore.LIGHTWHITE_EX}
+▒ by d3adc0de (@klezVirus)
+{Fore.RED}__________________________________________________________________________________{Fore.WHITE}
+
 """
     # mind-blowing banner rendering
     os.system('color')
@@ -1056,13 +1091,13 @@ def author():
     print(Fore.LIGHTBLACK_EX + "▩" * 82)
 
     for cmd, out in info.items():
-        print(f"{Fore.WHITE}░ {Fore.LIGHTGREEN_EX}$ ", end='', flush=True)
+        print(f"{Fore.WHITE}▒ {Fore.LIGHTGREEN_EX}$ ", end='', flush=True)
         time.sleep(0.5)
         for char in cmd:
             print(char, end='', flush=True)
             time.sleep(0.1)
         print()
-        print(f"{Fore.WHITE}░ ", end='', flush=True)
+        print(f"{Fore.WHITE}▒ ", end='', flush=True)
         time.sleep(0.5)
         print(f"{Fore.LIGHTCYAN_EX}{out}{Fore.WHITE}")
         time.sleep(0.3)
@@ -1173,4 +1208,4 @@ if __name__ == '__main__':
         amsi = AMSITrigger()
         amsi.check(args.output)
 
-    Console.auto_line(f"[+] Ended obfuscation at {datetime.utcnow()}")
+    Console.auto_line(f"[+] Ended obfuscation at {datetime.utcnow()}\n")
