@@ -509,7 +509,8 @@ class Chimera:
 
                 if match in self.dont_backtick:
                     continue
-                if _t < 1 or match.find("$") + line.find("[") + line.find("]") > -3 or line.count(match) > 1 or re.search(r"[\w]+", match) is None:
+                if _t < 1 or match.find("$") + line.find("[") + line.find("]") > -3 or line.count(
+                        match) > 1 or re.search(r"[\w]+", match) is None:
                     continue
                 _content[n] = line.replace(match, self.backticker(match))
 
@@ -1168,11 +1169,16 @@ if __name__ == '__main__':
     parser.add_argument(
         'target', default=None, help='Script to obfuscate')
 
-    args = parser.parse_args()
-
-    if args.about:
+    try:
+        sys.argv.index("--about")
+        welcome()
         author()
-        sys.exit(0)
+        if len(sys.argv) == 2:
+            sys.exit(0)
+    except ValueError:
+        pass
+
+    args = parser.parse_args()
 
     welcome()
     level = args.level

@@ -8,14 +8,14 @@ mostly the same techniques to evade common detection signatures, such as:
 * string substitution (variables, functions, data-types)
 * variable concatenation
 * indentation randomization
-* semi-random backticking
+* semi-random backticks insertion
 * case randomization
 * encoding 
 
 ## Why porting it
 
 Chimera was indeed a shiny project, so why did I decided to port it to Python and why you should use chameleon?
-Well, there are several reasons why I decided to build Chameleon. I wrote a more detailed post about them [here][6]. 
+Well, there are several reasons why I decided to build Chameleon. I wrote a more detailed post about them [here][7]. 
 I've also listed below the most important ones. 
 
 ##### Reliability
@@ -59,7 +59,7 @@ So far, we've talked about the efficiency and reliability issues of chimera, but
 from an obfuscation standpoint? The techniques used by Chameleon are for the most the same as Chimera, with some improvements:
 
 * "Smart" variable scope identification (function local variables will be replaced "carefully" or left untouched)
-* Random backticking (not just limited to a set of strings)
+* Random backticks insertion (not just limited to a set of strings)
 * Random case switch (not just limited to a set of strings)
 * Supports an external obfuscation mapping for functions ~~and parameters~~ (TODO)
 * Additional Base64 Encoding wrapping
@@ -157,3 +157,4 @@ obfuscation process was ported from Bash to Python (of course with some mods).
 [4]: https://github.com/RythmStick/AMSITrigger
 [5]: https://github.com/RythmStick
 [6]: https://github.com/danielbohannon/Invoke-Obfuscation
+[7]: https://github.com/klezVirus/chameleon
