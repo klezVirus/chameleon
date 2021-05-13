@@ -10,6 +10,7 @@ __pycache__/
 .idea/
 *.ps1
 *.json
+*.7z
 !utils/**
 
 # Distribution / packaging

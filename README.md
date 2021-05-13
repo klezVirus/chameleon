@@ -157,4 +157,4 @@ obfuscation process was ported from Bash to Python (of course with some mods).
 [4]: https://github.com/RythmStick/AMSITrigger
 [5]: https://github.com/RythmStick
 [6]: https://github.com/danielbohannon/Invoke-Obfuscation
-[7]: https://github.com/klezVirus/chameleon
+[7]: https://klezvirus.github.io/RedTeaming/AV_Evasion/BornFromAChimera/
