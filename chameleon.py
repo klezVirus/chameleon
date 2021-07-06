@@ -220,11 +220,12 @@ class ObfuscationLevel:
 
 
 class Chimera:
-    def __init__(self, filename, outfile, config: dict = None, lvl_id: int = 0, fmap: str = None):
+    def __init__(self, filename, outfile, config: dict = None, lvl_id: int = 0, fmap: str = None, quiet: bool = False):
         self.content = None
         self.outfile = outfile
         self.eol = os.linesep
         self.load_from_file(filename=filename)
+        self.quiet = quiet
         # Use case randomization
         self.case_randomization = config["cases"]
 
@@ -875,84 +876,84 @@ class Chimera:
 
     def obfuscate(self):
 
-        Console.auto("  [*] Zeroing out comments... ")
+        Console.auto("  [*] Zeroing out comments... ", quiet=self.quiet)
         self.replace_comments()
-        Console.auto_line("Done")
+        Console.auto_line("Done", quiet=self.quiet)
 
-        Console.auto_line("[+] Chameleon: standard obfuscation")
+        Console.auto_line("[+] Chameleon: standard obfuscation", quiet=self.quiet)
 
-        Console.auto_line("  [*] Identifying scoped variables and reflective constructors")
+        Console.auto_line("  [*] Identifying scoped variables and reflective constructors", quiet=self.quiet)
         if self.config["safe"]:
             self.identify_reflective_constructors()
         self.identify_scoped_variables()
         if len(self.scoped_variables) > 0:
             if self.config["verbose"]:
-                Console.auto_line("    [>] These variables will not be obfuscated")
-                Console.auto_line(f"    [>] {', '.join(self.scoped_variables)}")
+                Console.auto_line("    [>] These variables will not be obfuscated", quiet=self.quiet)
+                Console.auto_line(f"    [>] {', '.join(self.scoped_variables)}", quiet=self.quiet)
             else:
                 Console.auto_line(f"    [>] Identified {len(self.scoped_variables)} scoped variables "
-                                  f"which will not be obfuscated")
+                                  f"which will not be obfuscated", quiet=self.quiet)
         else:
-            Console.auto_line("    [-] No variables found")
+            Console.auto_line("    [-] No variables found", quiet=self.quiet)
         if self.config["variables"]:
-            Console.auto("  [*] Variables Obfuscation... ")
+            Console.auto("  [*] Variables Obfuscation... ", quiet=self.quiet)
             self.replace_variables()
-            Console.auto_line("Done")
+            Console.auto_line("Done", quiet=self.quiet)
         if self.config["data-types"]:
-            Console.auto("  [*] Data Types Obfuscation... ")
+            Console.auto("  [*] Data Types Obfuscation... ", quiet=self.quiet)
             self.replace_data_types()
-            Console.auto_line("Done")
+            Console.auto_line("Done", quiet=self.quiet)
         if self.config["functions"]:
-            Console.auto("  [*] Function Obfuscation... ")
+            Console.auto("  [*] Function Obfuscation... ", quiet=self.quiet)
             self.replace_functions()
-            Console.auto_line("Done")
+            Console.auto_line("Done", quiet=self.quiet)
         if self.config["nishang"]:
-            Console.auto("  [*] Nishang Obfuscation... ")
+            Console.auto("  [*] Nishang Obfuscation... ", quiet=self.quiet)
             self.nishang_script()
-            Console.auto_line("Done")
+            Console.auto_line("Done", quiet=self.quiet)
         if self.config["cases"]:
-            Console.auto("  [*] Cases randomization... ")
+            Console.auto("  [*] Cases randomization... ", quiet=self.quiet)
             self.randomize_cases()
-            Console.auto_line("Done")
+            Console.auto_line("Done", quiet=self.quiet)
         if self.config["hex-ip"]:
-            Console.auto("  [*] IP Address to Hex... ")
+            Console.auto("  [*] IP Address to Hex... ", quiet=self.quiet)
             self.hex_address()
-            Console.auto_line("Done")
+            Console.auto_line("Done", quiet=self.quiet)
         if self.config["comments"]:
-            Console.auto("  [*] Comments Obfuscation... ")
+            Console.auto("  [*] Comments Obfuscation... ", quiet=self.quiet)
             self.insert_comments()
-            Console.auto_line("Done")
+            Console.auto_line("Done", quiet=self.quiet)
         else:
-            Console.auto("  [*] Removing comment placeholders... ")
+            Console.auto("  [*] Removing comment placeholders... ", quiet=self.quiet)
             self.remove_comment_placeholders()
-            Console.auto_line("Done")
+            Console.auto_line("Done", quiet=self.quiet)
         if self.config["spaces"]:
-            Console.auto("  [*] Indentation Randomization... ")
+            Console.auto("  [*] Indentation Randomization... ", quiet=self.quiet)
             self.indentation_randomization()
-            Console.auto_line("Done")
+            Console.auto_line("Done", quiet=self.quiet)
         if self.config["strings"]:
-            Console.auto("  [*] Strings Obfuscation... ")
+            Console.auto("  [*] Strings Obfuscation... ", quiet=self.quiet)
             self.replace_strings()
-            Console.auto_line("Done")
+            Console.auto_line("Done", quiet=self.quiet)
         if self.config["random-backticks"]:
-            Console.auto("  [*] Random Backticking... ")
+            Console.auto("  [*] Random Backticking... ", quiet=self.quiet)
             self.random_backtick()
-            Console.auto_line("Done")
-        Console.auto_line("[+] Chameleon: obfuscation via encoding")
+            Console.auto_line("Done", quiet=self.quiet)
+        Console.auto_line("[+] Chameleon: obfuscation via encoding", quiet=self.quiet)
         if self.config["decimal"]:
-            Console.auto("  [*] Converting to decimal... ")
+            Console.auto("  [*] Converting to decimal... ", quiet=self.quiet)
             self.convert_decimal()
-            Console.auto_line("Done")
+            Console.auto_line("Done", quiet=self.quiet)
         if self.config["base64"]:
-            Console.auto("  [*] Converting to base64... ")
+            Console.auto("  [*] Converting to base64... ", quiet=self.quiet)
             self.convert_base64()
-            Console.auto_line("Done")
+            Console.auto_line("Done", quiet=self.quiet)
 
     def write_file(self):
-        Console.auto(f"  [*] Writing obfuscated payload to {self.outfile}... ")
+        Console.auto(f"  [*] Writing obfuscated payload to {self.outfile}... ", quiet=self.quiet)
         with open(self.outfile, "w") as out:
             out.write(self.content)
-            Console.auto_line("Done")
+            Console.auto_line("Done", quiet=self.quiet)
         # print(self.content)
 
 
@@ -1017,7 +1018,9 @@ class Console:
         Console.write_line(what=what, color=Fore.YELLOW)
 
     @staticmethod
-    def auto(what):
+    def auto(what, quiet=False):
+        if quiet:
+            return
         if what.find("[+]") > -1:
             Console.success(what=what)
         elif what.find("[*]") > -1:
@@ -1036,7 +1039,9 @@ class Console:
             Console.write(what=what)
 
     @staticmethod
-    def auto_line(what):
+    def auto_line(what, quiet=False):
+        if quiet:
+            return
         if what.find("[+]") > -1:
             Console.success_line(what=what)
         elif what.find("[*]") > -1:
