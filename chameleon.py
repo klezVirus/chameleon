@@ -219,7 +219,7 @@ class ObfuscationLevel:
             self.token_max = 1
 
 
-class Chimera:
+class Chameleon:
     def __init__(self, filename, outfile, config: dict = None, lvl_id: int = 0, fmap: str = None, quiet: bool = False):
         self.content = None
         self.outfile = outfile
@@ -857,7 +857,7 @@ class Chimera:
         for k, v in mapping.items():
             new_params = {}
             new_params["original"] = v
-            new_params["repl"] = [Chimera.scramble(param) if scope != "function" else param for param in v]
+            new_params["repl"] = [Chameleon.scramble(param) if scope != "function" else param for param in v]
 
             new_mapping[k] = {
                 "repl": self.random_ascii_string(
@@ -1208,11 +1208,11 @@ if __name__ == '__main__':
         "verbose": args.verbose
     }
 
-    chimera = Chimera(filename=args.target, outfile=args.output, config=config, fmap=args.function_mapping)
+    chameleon = Chameleon(filename=args.target, outfile=args.output, config=config, fmap=args.function_mapping)
 
     Console.auto_line(f"[+] Starting obfuscation at {datetime.utcnow()}")
-    chimera.obfuscate()
-    chimera.write_file()
+    chameleon.obfuscate()
+    chameleon.write_file()
 
     if args.check:
         Console.auto_line("  [#] Checking file against AMSI Trigger...")
