@@ -49,7 +49,7 @@ class Utils:
 
     @staticmethod
     def get_project_root():
-        return str(Path('__FILE__').parent.absolute())
+        return str(Path(__file__).parent.absolute())
 
 
 class PSContextType(Enum):
@@ -846,10 +846,10 @@ class Chameleon:
                         print(f"Function closes at line {n}")
                     tree.close()
         if not self.function_mapping:
-            Console.auto("    [>] Generating function mapping... ")
+            Console.auto("    [>] Generating function mapping... ", quiet=self.quiet)
             self.generate_mapping(mapping)
             self.save_mapping()
-            Console.auto_line("Success")
+            Console.auto_line("Success", quiet=self.quiet)
         self.clean_scoped_variables()
 
     def generate_mapping(self, mapping, scope="function"):
