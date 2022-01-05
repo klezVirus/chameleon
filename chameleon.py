@@ -410,7 +410,10 @@ class Chameleon:
                 w.append(self.backticker(wrap))
         else:
             w = wrapper
-        self.content = f"{w[0]}(-join(({','.join([str(int(b)) for b in self.content.encode()])})|%{{[char]$_}}));{w[1]}"
+        self.content = f"{w[0]}(-join(({','.join([str(int(b)) for b in self.content.encode()])})|%{{[char]$_}}));"
+
+        if not self.config["no-exit"]:
+            self.content += f"{w[1]}"
 
     def convert_base64(self):
         wrapper = ["iex", "exit"]
@@ -431,7 +434,10 @@ class Chameleon:
 
         self.content = f"{w[0]}(" \
                        f"{enc}(" \
-                       f"{conv}('{payload}')));{w[1]}"
+                       f"{conv}('{payload}')));"
+
+        if not self.config["no-exit"]:
+            self.content += f"{w[1]}"
 
     def replace_comments(self):
         # Get rid of <# ... #> comments
@@ -1154,6 +1160,8 @@ if __name__ == '__main__':
     parser.add_argument(
         '--base64', required=False, action="store_true", help='Convert obfuscated payload to base64 format')
     parser.add_argument(
+        '--no-exit', required=False, action="store_true", help='Do not put an exit command after base64 or decimal encoded code')
+    parser.add_argument(
         '-z', '--check', required=False, action="store_true",
         help='Check the script against AMSI Trigger (@RythmStick, @rasta-mouse)')
     parser.add_argument(
@@ -1201,6 +1209,7 @@ if __name__ == '__main__':
         "backticks-list": args.backticks,
         "hex-ip": args.hex_ip or args.enable_all,
         "random-type": args.randomization_type.lower(),
+        "no-exit": args.no_exit,
         "decimal": args.decimal,
         "base64": args.base64,
         "tfn-values": args.true_false_null,
