@@ -295,8 +295,14 @@ class Chameleon:
         if not os.path.isfile(filename):
             Console.auto_line("[-] File not found")
             sys.exit(1)
-        with open(filename, 'r') as in_file:
-            self.content = in_file.read()
+        with open(filename, 'rb') as in_file:
+            raw = in_file.read()
+            if len(raw) <= 3:
+                Console.auto_line("[-] This file doesn't seem a valid PowerShell script")
+            bom = 0
+            while chr(raw[bom]) not in string.printable:
+                bom += 1
+            self.content = raw[bom:].decode(encoding="windows-1252", errors="replace")
         if not len(self.content.split(self.eol)) > 1:
             self.eol = "\n"
 
