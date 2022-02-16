@@ -11,7 +11,7 @@ __pycache__/
 *.ps1
 *.json
 *.7z
-!utils/**
+!utils/AMSITrigger.exe
 
 # Distribution / packaging
 .Python
