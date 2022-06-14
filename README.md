@@ -1,4 +1,4 @@
-:triangular_flag_on_post: This is the public repository of CrackMapExec, for latest version and updates please consider supporting us through https://porchetta.industries/
+:triangular_flag_on_post: This is the public repository of chameleon, for latest version and updates please consider supporting us through https://porchetta.industries/
 
 # Chameleon
 
@@ -6,7 +6,7 @@ Chameleon is yet another PowerShell obfuscation tool designed to bypass AMSI and
 
 ## :triangular_flag_on_post: Sponsors
 
-If you want to sponsors this project and have the latest updates on CME, latest issues fixed, latest features, please support us on https://porchetta.industries/
+If you want to sponsors this project and have the latest updates on chameleon, latest issues fixed, latest features, please support us on https://porchetta.industries/
 
 ## Official Discord Channel
 
