@@ -670,7 +670,7 @@ class Chameleon:
                     match.group() + "\n" + "\n".join([f"{v} = {k}" for k, v in special_vars.items()])
                 )
 
-        var_pattern = re.compile(r'\$[\w|_]+')
+        var_pattern = re.compile(r'\$\w+')
         matches = [match.group() for match in var_pattern.finditer(self.content)]
         matches = list(set(matches))
         matches.sort(key=len)
