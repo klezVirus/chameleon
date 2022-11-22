@@ -460,23 +460,11 @@ class Chameleon:
         _content = self.eol.join(rows)
 
         # Single Line Comments
-        slc_pattern = re.compile(r"#.+")
+        slc_pattern = re.compile(r"#[^(\"|')]+?\n")
         s1_pattern = re.compile(r"\"([^\"]*)\"")
         s2_pattern = re.compile(r"'([^']*)'")
-        for line in rows:
-            match = slc_pattern.search(line)
-            if match:
-                # Single string, we don't do anything = won't break the script
-                res = [s1_pattern.search(line), s2_pattern.search(line)]
-                if any(res):
-                    res = [r.group() for r in res if r and r.group().find("#") > -1]
-                else:
-                    res = []
-                if len(res) > 0:
-                    continue
 
-                _content = _content.replace(match.group(), self.placeholder)
-                self.content = _content
+        self.content = slc_pattern.sub(f"{self.placeholder}\n", _content)
 
     def remove_comment_placeholders(self):
         while self.content.find(self.placeholder) >= 0:
