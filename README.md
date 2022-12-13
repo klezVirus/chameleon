@@ -1,6 +1,21 @@
+:triangular_flag_on_post: This is the public repository of chameleon, for latest version and updates please consider supporting us through https://porchetta.industries/
+
 # Chameleon
 
 Chameleon is yet another PowerShell obfuscation tool designed to bypass AMSI and commercial antivirus solutions. 
+
+## :triangular_flag_on_post: Sponsors
+
+If you want to sponsors this project and have the latest updates on chameleon, latest issues fixed, latest features, please support us on https://porchetta.industries/
+
+## Official Discord Channel
+
+Come hang out on Discord!
+
+[![Porchetta Industries](https://discordapp.com/api/guilds/736724457258745996/widget.png?style=banner3)](https://discord.gg/ycGXUxy)
+
+## Overview
+
 The tool has been developed as a Python port of the [Chimera][1] project, by [tokioneon_][2]. As such, it uses 
 mostly the same techniques to evade common detection signatures, such as:
 
