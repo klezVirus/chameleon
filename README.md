@@ -1,18 +1,14 @@
-:triangular_flag_on_post: This is the public repository of chameleon, for latest version and updates please consider supporting us through https://porchetta.industries/
-
 # Chameleon
 
-Chameleon is yet another PowerShell obfuscation tool designed to bypass AMSI and commercial antivirus solutions. 
+Chameleon is yet another PowerShell obfuscation tool designed to bypass AMSI and commercial antivirus solutions.
 
-## :triangular_flag_on_post: Sponsors
+![Chameleon](assets/Chameleon_green_white.svg)
 
-If you want to sponsors this project and have the latest updates on chameleon, latest issues fixed, latest features, please support us on https://porchetta.industries/
-
-## Official Discord Channel
+## Official Discord Channel (Inceptor)
 
 Come hang out on Discord!
 
-[![Porchetta Industries](https://discordapp.com/api/guilds/736724457258745996/widget.png?style=banner3)](https://discord.gg/ycGXUxy)
+[![Inceptor](https://discordapp.com/api/guilds/1155753953108164628/widget.png?style=banner2)](https://discord.gg/Z66VdyCv)
 
 ## Overview
 
@@ -29,7 +25,7 @@ mostly the same techniques to evade common detection signatures, such as:
 
 ## Why porting it
 
-Chimera was indeed a shiny project, so why did I decided to port it to Python and why you should use chameleon?
+Chimera was indeed a shiny project, so why did I decide to port it to Python and why you should use chameleon?
 Well, there are several reasons why I decided to build Chameleon. I wrote a more detailed post about them [here][7]. 
 I've also listed below the most important ones. 
 
